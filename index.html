@@ -1,0 +1,92 @@
+<!-- 
+client ID: 0d78319bc5524946a22a085d45ade53c
+client Secret: a7aac3e6534d4586a891edc2a386c1f9
+redirect URI: http://localhost:8888/Spotify_WDC/success.html
+scope: playlist-read-private
+-->
+
+<html>
+	<head>
+		<script src="https://code.jquery.com/jquery-2.2.3.min.js"   integrity="sha256-a23g1Nt4dtEYOj7bR+vTu7+T8VP13humZFBJNIYoEJo="   crossorigin="anonymous"></script>
+	</head>
+
+<body>
+
+
+</div>
+	<button id="login" onclick="prompt_login()">Login</button>
+	<div id="main">
+		<select id="select" multiple size=100vh>
+		</select>
+	</div>
+</body>
+
+<script>
+
+
+function prompt_login() {
+
+	var CLIENT_ID = "0d78319bc5524946a22a085d45ade53c";
+	var REDIRECT_URI = "http://localhost:8888/Spotify_WDC/index.html";
+
+	var url = "https://accounts.spotify.com/authorize/?client_id=" + 
+		CLIENT_ID + 
+		"&response_type=token&redirect_uri=" + REDIRECT_URI + 
+		"&scope=user-read-private%20user-read-email";
+
+	var w = window.location.assign(url);
+	console.log(window.location.href);
+};
+
+// can we delay this to the second window load?
+window.onload = function(){
+	var path = window.location.href;
+	var accessToken = path.split("access_token=")[1].split("&token_type")[0];
+	console.log(accessToken)
+
+
+	var callback = function(data){
+		console.log(data);
+		var playlists = data.items;
+		var select = document.getElementById("select")
+		document.getElementById("login").style.visibility = "hidden";
+		// add saved songs option first
+		var text = ""
+		for (i=0; i < playlists.length; i++){
+			text += "<option value=" + playlists[i]["name"] + ">" + playlists[i]["name"] + "</option>"
+		};
+		select.innerHTML = text;
+
+		// main.innerHTML = playlists;
+	}
+
+	var get_user_info = function(token, cb) {
+		$.ajax({
+			url: 'https://api.spotify.com/v1/me',
+			headers: {
+			    'Authorization': 'Bearer ' + token
+			},
+			success: function(response) {
+				console.log(response);
+				$.ajax({
+				url: 'https://api.spotify.com/v1/users/' +response["id"] + '/playlists?limit=50',
+				headers: {
+					'Authorization': 'Bearer ' + token
+				},
+				success: cb
+		})
+			}
+		})
+	};
+
+	get_user_info(accessToken, callback);
+}
+
+
+
+
+
+
+</script>
+
+</html>
