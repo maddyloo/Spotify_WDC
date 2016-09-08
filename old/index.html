@@ -1,0 +1,204 @@
+<!-- 
+client ID: 0d78319bc5524946a22a085d45ade53c
+client Secret: a7aac3e6534d4586a891edc2a386c1f9
+redirect URI: http://localhost:8888/Spotify_WDC/success.html
+scope: playlist-read-private
+-->
+
+<html>
+	<head>
+		<script src="https://code.jquery.com/jquery-2.2.3.min.js"   integrity="sha256-a23g1Nt4dtEYOj7bR+vTu7+T8VP13humZFBJNIYoEJo="   crossorigin="anonymous"></script>
+		<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js" integrity="sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS" crossorigin="anonymous"></script>
+		<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" integrity="sha384-1q8mTJOASx8j1Au+a5WDVnPi2lkFfwwEAa8hDDdjZlpLegxhjVME1fgjWPGmkzs7" crossorigin="anonymous">
+
+	</head>
+
+<body>
+
+
+<div class="container">
+	<div class= "row" id="login">
+		<h2>Login to your spotify account:</h2>
+		<button onclick="prompt_login()" class="btn btn-primary">Login</button>
+	</div>
+	<form name="myform" id="select" class="checkbox"></form>
+</div>
+</body>
+
+<script>
+var accessToken = ""
+var user_id = ""
+var saved_offset = 0;
+var playlist_offset = 0;
+var playlist_name = "";
+
+var super_storage = []
+
+function get_saved(token, user, cb_saved, offset){
+	for (i=0; i<1; i++){
+		var url = 'https://api.spotify.com/v1/me/tracks?limit=50&offset=' + offset;
+		 $.ajax({
+			url: url,
+			headers: {
+			    'Authorization': 'Bearer ' + token
+			},
+			success: 
+			cb_saved,
+		})
+		saved_offset += 50;
+	}
+}
+
+//process callback/returned data (songs from playlists)
+var callback_saved = function(data, offset){
+	for (i=0; i<data["items"].length; i++){
+		var song = data["items"][i]["track"]["name"];
+		var added = data["items"][i]["added_at"];
+		var artist = data["items"][i]["track"]['artists'][0]['name'];
+		var popularity = data["items"][i]["track"]["popularity"];
+		super_storage.push({"playlist":"Saved Songs","song":song,"added":added, "artist":artist, "popularity":popularity})
+	}
+	if (saved_offset < data["total"]) {
+		get_saved(accessToken, user_id, callback_saved, saved_offset);
+	}
+	console.log(super_storage)
+}
+
+function get_playlist(token, user, cb_playlist, playlist_id){
+	for (j=0; j<1; j++) {
+		var url = 'https://api.spotify.com/v1/users/' + user + '/playlists/' + playlist_id + '/tracks?limit=100';
+		$.ajax({
+			url: url,
+			headers: {
+				'Authorization' : 'Bearer ' + token
+			},
+			success:
+			cb_playlist,
+		})
+		//playlist_offset += 100
+	}
+}
+
+var callback_playlist = function(data, offset){
+	for (i=0; i<data["items"].length; i++){
+		var song = data["items"][i]["track"]["name"];
+		var added = data["items"][i]["added_at"];
+		var artist = data["items"][i]["track"]['artists'][0]['name'];
+		var popularity = data["items"][i]["track"]["popularity"];
+		super_storage.push({"playlist": playlist_name,"song":song,"added":added, "artist":artist, "popularity":popularity})
+	}
+	console.log(playlist_name)
+	console.log(super_storage)
+}
+
+function get_songs(form){
+
+	// get all songs
+	if (form.elements[0].checked){
+
+		// get saved
+
+		//get others
+
+	} else {
+		var selected = []
+
+		// loop thru form, get value if checked
+		for (i=0; i<form.elements.length; i++){
+			if (form.elements[i].checked){
+				selected.push(form.elements[i]);
+				playlist_name = form.elements[i]["value"].split("-")[1]
+				try {
+					// split at -
+					var temp_id = form.elements[i]["value"].split("-")[0]
+					
+					get_playlist(accessToken, user_id, callback_playlist, temp_id)
+				}
+				catch(err) {
+					console.log(err);
+				}
+			}
+		}
+		//need to get saved songs?
+		if (selected.indexOf("Saved_Songs") > -1){
+			get_saved(accessToken, user_id, callback_saved, saved_offset);
+		}
+	}
+}
+
+
+document.getElementById("select").style.visibility = "hidden";
+
+// sends inital CLIENT_ID to begin authenitcation process
+// SCOPES included here (separated by %20, dumbass)
+function prompt_login() {
+
+	var CLIENT_ID = "0d78319bc5524946a22a085d45ade53c";
+	var REDIRECT_URI = "http://localhost:8888/Spotify_WDC/index.html";
+
+	var url = "https://accounts.spotify.com/authorize/?client_id=" + 
+		CLIENT_ID + 
+		"&response_type=token&redirect_uri=" + REDIRECT_URI + 
+		"&scope=user-read-private%20playlist-read-private%20user-library-read";
+
+	var w = window.location.assign(url);
+};
+
+// after inital (first pass) authentication, uses access code to get access token
+// TODO: can we delay this to the second window load?
+window.onload = function(){
+
+	var path = window.location.href;
+	accessToken = path.split("access_token=")[1].split("&token_type")[0];
+
+	var callback = function(data){
+		var playlists = data.items;
+		var select = document.getElementById("select")
+		document.getElementById("login").innerHTML = "";
+		// add saved songs option first
+		var text = "<h2>Select Playlists to import</h2><h4>**note: currently this only includes playlists you, yourself have created.  Not ones you have subscribed to</h4><label><input type=checkbox value=all_songs><b>GET ALL SONGS<b></label><br><label><input type=checkbox value=Saved_Songs><b>Saved Songs<b></label><br>";
+		// how to get the number of saved songs tho...
+		for (i=0; i < playlists.length; i++){
+			// playlists identified by ID - use ID as value; length is in this, can we pass it through?
+			// only include playlists users have created themselves
+			if (playlists[i]["owner"]["id"] = user_id) {
+				// store id and name
+				var value = playlists[i]["id"] + "-" + playlists[i]["name"]
+				text += "<label><input type=checkbox value=" + value + "><b>" + playlists[i]["name"] + "</b> - " + playlists[i]["tracks"]["total"] + " songs</label><br>";
+			};
+		}
+			
+		text += "<input type=button value=Submit onclick=get_songs(this.form)>"
+		select.innerHTML = text;
+		select.style.visibility = "visible";	
+	}
+
+	// uses access token to retrieve up to 50 playlists from a user
+	// TODO: get more playlists using offset?
+	var get_user_info = function(token, cb) {
+		$.ajax({
+			url: 'https://api.spotify.com/v1/me',
+			headers: {
+			    'Authorization': 'Bearer ' + token
+			},
+			success: function(response) {
+				user_id = response["id"];
+				$.ajax({
+				url: 'https://api.spotify.com/v1/users/' +response["id"] + '/playlists?limit=50',
+				headers: {
+					'Authorization': 'Bearer ' + token
+				},
+				success: cb
+		})
+			}
+		})
+	};
+
+	// calls authentication/playlist retrieval function
+	get_user_info(accessToken, callback);
+
+}
+
+</script>
+
+</html>
